@@ -16,11 +16,13 @@ class CreateUser(graphene.Mutation):
         username = graphene.String(required=True)
         password = graphene.String(required=True)
         email = graphene.String(required=True)
+        is_superuser = graphene.Boolean()
 
-    def mutate(self, info, username, password, email):
+    def mutate(self, info, username, password, email, is_superuser=False):
         user = get_user_model()(
             username=username,
             email=email,
+            is_superuser=is_superuser
         )
         user.set_password(password)
         user.save()
