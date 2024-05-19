@@ -38,15 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'graphene_django',
-#    'alumnos',
-#    'anexos_alumnos',
-#    'deptos',
-#    'inscripcion',
-#    'padres_tutores',
-#    'pagos',
-#    'permisos',
-#    'permisos_usuarios',
-#    'usuarios,'
+    'easyenroll',
 
 ]
 
@@ -135,5 +127,5 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 GRAPHENE = {
-    'SCHEMA': 'easyenroll.schema.schema',
+    'SCHEMA': 'modulo_secundaria.schema.schema',
 }
