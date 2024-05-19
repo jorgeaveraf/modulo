@@ -127,5 +127,5 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 GRAPHENE = {
-    'SCHEMA': 'easyenroll.schema.schema',
+    'SCHEMA': 'modulo_secundaria.schema.schema',
 }

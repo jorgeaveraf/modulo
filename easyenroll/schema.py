@@ -1,6 +1,9 @@
+from django.conf import settings
 import graphene
 from graphene_django import DjangoObjectType
 from .models import Inscripcion, Pago, Alumno, PadresTutores, AnexoAlumnos
+from users.schema import UserType
+from django.contrib.auth import get_user_model
 
 class StudentType(DjangoObjectType):
     class Meta: 
@@ -152,12 +155,135 @@ class CreateInscripcion(graphene.Mutation):
     factura = graphene.Boolean()
     tipo_inscripcion = graphene.String()
     modalidad_pago = graphene.String()
-    id_alumno = graphene.Field(StudentType)
-    id_pago = graphene.Field(PaymentType)
-    
+    alumno = graphene.Field(lambda: StudentType)
+    pago = graphene.Field(lambda: PaymentType)
+    usuario = graphene.Field(lambda: UserType)
+
+    class Arguments:
+        factura = graphene.Boolean()
+        tipo_inscripcion = graphene.String()
+        modalidad_pago = graphene.String()
+        id_alumno = graphene.Int()
+        id_pago = graphene.Int()
+        id_usuario = graphene.Int()
+
+    def mutate(self, info, factura, tipo_inscripcion, modalidad_pago, id_alumno, id_pago, id_usuario):
+        student = Alumno.objects.get(pk=id_alumno)
+        payment = Pago.objects.get(pk=id_pago)
+        user = get_user_model().objects.get(pk=id_usuario)
+        enrollment = Inscripcion(
+            factura=factura,
+            tipoInscripcion=tipo_inscripcion,
+            modalidadPago=modalidad_pago,
+            idAlumno=student,
+            idPago=payment,
+            idUsuario=user
+        )
+        enrollment.save()
+
+        return CreateInscripcion(
+            id=enrollment.id,
+            factura=enrollment.factura,
+            tipo_inscripcion=enrollment.tipoInscripcion,
+            modalidad_pago=enrollment.modalidadPago,
+            alumno=enrollment.idAlumno,
+            pago=enrollment.idPago,
+            usuario=enrollment.idUsuario,
+        )
+
+'''class CreateAnexoAlumnos(graphene.Mutation):
+fields=[
+                ('id', models.AutoField(primary_key=True, serialize=False)),
+                ('carta_buena_conducta', models.BooleanField(default=False)),
+                ('certificado_primaria', models.BooleanField(default=False)),
+                ('curp_alumno', models.BooleanField(default=False)),
+                ('acta_nacimiento', models.BooleanField(default=False)),
+                ('observaciones', models.TextField(blank=True)),
+                ('cda', models.URLField(blank=True)),
+                ('autorizacion_irse_solo', models.BooleanField(default=False)),
+                ('autorizacion_publicitaria', models.BooleanField(default=False)),
+                ('atencion_psicologica', models.BooleanField(default=False)),
+                ('padecimiento', models.TextField(blank=True)),
+                ('uso_aparato_auditivo', models.BooleanField(default=False)),
+                ('uso_de_lentes', models.BooleanField(default=False)),
+                ('lateralidad', models.CharField(max_length=1)),
+                ('id_alumno', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='easyenroll.alumno')),
+            ],
+'''
+class createAnexoAlumnos(graphene.Mutation):
+    id = graphene.Int()
+    carta_buena_conducta = graphene.Boolean()
+    certificado_primaria = graphene.Boolean()
+    curp_alumno = graphene.Boolean()
+    acta_nacimiento = graphene.Boolean()
+    observaciones = graphene.String()
+    cda = graphene.String()
+    autorizacion_irse_solo = graphene.Boolean()
+    autorizacion_publicitaria = graphene.Boolean()
+    atencion_psicologica = graphene.Boolean()
+    padecimiento = graphene.String()
+    uso_aparato_auditivo = graphene.Boolean()
+    uso_de_lentes = graphene.Boolean()
+    lateralidad = graphene.String()
+    alumno = graphene.Field(lambda: StudentType)
+
+    class Arguments:
+        carta_buena_conducta = graphene.Boolean()
+        certificado_primaria = graphene.Boolean()
+        curp_alumno = graphene.Boolean()
+        acta_nacimiento = graphene.Boolean()
+        observaciones = graphene.String()
+        cda = graphene.String()
+        autorizacion_irse_solo = graphene.Boolean()
+        autorizacion_publicitaria = graphene.Boolean()
+        atencion_psicologica = graphene.Boolean()
+        padecimiento = graphene.String()
+        uso_aparato_auditivo = graphene.Boolean()
+        uso_de_lentes = graphene.Boolean()
+        lateralidad = graphene.String()
+        id_alumno = graphene.Int()
+
+    def mutate(self, info, carta_buena_conducta, certificado_primaria, curp_alumno, acta_nacimiento, observaciones, cda, autorizacion_irse_solo, autorizacion_publicitaria, atencion_psicologica, padecimiento, uso_aparato_auditivo, uso_de_lentes, lateralidad, id_alumno):
+        student = Alumno.objects.get(pk=id_alumno)
+        annex = AnexoAlumnos(
+            cartaBuenaConducta=carta_buena_conducta,
+            certificadoPrimaria=certificado_primaria,
+            curpAlumno=curp_alumno,
+            actaNacimiento=acta_nacimiento,
+            observaciones=observaciones,
+            cda=cda,
+            autorizacionIrseSolo=autorizacion_irse_solo,
+            autorizacionPublicitaria=autorizacion_publicitaria,
+            atencionPsicologica=atencion_psicologica,
+            padecimiento=padecimiento,
+            usoAparatoAuditivo=uso_aparato_auditivo,
+            usoDeLentes=uso_de_lentes,
+            lateralidad=lateralidad,
+            idAlumno=student
+        )
+        annex.save()
+
+        return createAnexoAlumnos(
+            id=annex.id,
+            carta_buena_conducta=annex.cartaBuenaConducta,
+            certificado_primaria=annex.certificadoPrimaria,
+            curp_alumno=annex.curpAlumno,
+            acta_nacimiento=annex.actaNacimiento,
+            observaciones=annex.observaciones,
+            cda=annex.cda,
+            autorizacion_irse_solo=annex.autorizacionIrseSolo,
+            autorizacion_publicitaria=annex.autorizacionPublicitaria,
+            atencion_psicologica=annex.atencionPsicologica,
+            padecimiento=annex.padecimiento,
+            uso_aparato_auditivo=annex.usoAparatoAuditivo,
+            uso_de_lentes=annex.usoDeLentes,
+            lateralidad=annex.lateralidad,
+            alumno=annex.idAlumno,
+        )
+
 class Mutation(graphene.ObjectType):
     create_student = CreateAlumno.Field()
     create_payment = CreatePago.Field()
     create_tutor = CreatePadresTutores.Field()
-
-schema = graphene.Schema(query=Query, mutation=Mutation)
+    create_enrollment = CreateInscripcion.Field()
+    create_annex = createAnexoAlumnos.Field()
