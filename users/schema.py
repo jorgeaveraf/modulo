@@ -17,6 +17,9 @@ class UserType(DjangoObjectType):
 
     def resolve_groups(self, info):
         return self.groups.all()
+    
+    def resolver_first_name(self, info):
+        return self.first_name
 
 
 class Query(graphene.ObjectType):
