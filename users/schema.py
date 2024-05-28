@@ -23,13 +23,13 @@ class UserType(DjangoObjectType):
 
 
 class Query(graphene.ObjectType):
-    me = graphene.Field(UserType)  # Agrega el campo 'me' para representar al usuario actual
+    me = graphene.Field(UserType)
 
     def resolve_me(self, info):
         user = info.context.user
         if user.is_anonymous:
             raise Exception('Debes estar autenticado para acceder a esta información.')
-        return user  # Devuelve el usuario actualmente autenticado
+        return user
 
     users = graphene.List(UserType)
 
