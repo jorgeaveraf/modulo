@@ -4,6 +4,7 @@ from graphene_django import DjangoObjectType
 from .models import Inscripcion, Pago, Alumno, PadresTutores, AnexoAlumnos
 from users.schema import UserType
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 class StudentType(DjangoObjectType):
     class Meta: 
@@ -26,22 +27,52 @@ class AnnexType(DjangoObjectType):
         model = AnexoAlumnos
 
 class Query(graphene.ObjectType):
-    students = graphene.List(StudentType)
-    enrollments = graphene.List(EnrollmentType)
+    students = graphene.List(StudentType, search=graphene.String())
+    enrollments = graphene.List(EnrollmentType, search=graphene.String(), tipo_inscripcion=graphene.String(), modalidad_pago=graphene.String(), id_alumno=graphene.String(), id_pago=graphene.Int(), id_usuario=graphene.String())
     payments = graphene.List(PaymentType)
-    tutors = graphene.List(TutorType)
+    tutors = graphene.List(TutorType, search=graphene.String())
     annexes = graphene.List(AnnexType)
 
-    def resolve_students(self, info):
+    def resolve_students(self, info, search=None):
+        if search:
+            filter = (
+                Q(nombre__icontains=search)
+            )
+            return Alumno.objects.filter(filter)
+        
         return Alumno.objects.all()
+    
+    def resolve_enrollments(self, info, tipo_inscripcion=None, modalidad_pago=None, id_alumno=None, id_pago=None, id_usuario=None):
+        filter = Q()
 
-    def resolve_enrollments(self, info):
-        return Inscripcion.objects.all()
+        if tipo_inscripcion:
+            filter &= Q(tipoInscripcion__icontains=tipo_inscripcion)
+        
+        if modalidad_pago:
+            filter &= Q(modalidadPago__icontains=modalidad_pago)
+
+        if id_alumno:
+            filter &= Q(idAlumno__nombre__icontains=id_alumno)
+
+        if id_pago:
+            filter &= Q(idPago__idRecibo__icontains=id_pago)
+
+        if id_usuario:
+            filter &= Q(idUsuario__username__icontains=id_usuario)
+
+        return Inscripcion.objects.filter(filter)
+
 
     def resolve_payments(self, info):
         return Pago.objects.all()
 
-    def resolve_tutors(self, info):
+    def resolve_tutors(self, info, search=None):
+        if search:
+            filter = (
+                Q(nombrePadreTutor__icontains=search)
+            )
+            return PadresTutores.objects.filter(filter)
+        
         return PadresTutores.objects.all()
 
     def resolve_annexes(self, info):
