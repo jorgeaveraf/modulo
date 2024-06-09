@@ -5,6 +5,62 @@ from .models import Inscripcion, Pago, Alumno, PadresTutores, AnexoAlumnos
 from users.schema import UserType
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+import re
+from datetime import date, datetime
+from graphql import GraphQLError
+
+def validate_email(email):
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        raise GraphQLError("Correo institucional no tiene un formato válido")
+
+def validate_curp(curp):
+    if not re.match(r"^[A-Z0-9]{18}$", curp):
+        raise GraphQLError("CURP no tiene un formato válido")
+    
+def validate_telefono(telefono):
+    if not re.match(r"^\d{10}$", telefono):
+        raise GraphQLError("El teléfono no tiene un formato válido")
+    
+def validate_url(url):
+    if not re.match(r"^(http|https)://", url):
+        raise GraphQLError("La URL no es válida")
+    
+def validate_modalidad_pago(modalidad_pago):
+    if modalidad_pago not in ["12", "10"]:
+        raise GraphQLError("Modalidad de pago no válida. Debe ser '12' o '10' meses")
+
+def validate_tipo_inscripcion(tipo_inscripcion):
+    if tipo_inscripcion not in ["inscripcion", "reinscripcion"]:
+        raise GraphQLError("Tipo de inscripción no válido. Debe ser 'Inscripcion' o 'Reinscripcion'")
+
+def validate_descuento(descuento):
+    if descuento < 0:
+        raise GraphQLError("El descuento no puede ser negativo")
+    if descuento > 100:
+        raise GraphQLError("El descuento no puede ser mayor al 100%")
+
+def validate_monto(monto):
+    if monto <= 0:
+        raise GraphQLError("El monto debe ser un valor positivo")
+
+def validate_fecha_pago(fecha_pago):
+    try:
+        if isinstance(fecha_pago, str):
+            fecha_pago = datetime.strptime(fecha_pago, '%Y-%m-%d').date()
+        if fecha_pago > date.today():
+            raise GraphQLError("La fecha de pago no puede ser una fecha futura")
+    except ValueError:
+        raise GraphQLError("El formato de la fecha debe ser YYYY-MM-DD")
+
+def validate_metodo_pago(metodo_pago):
+    valid_methods = ["E", "T", "Tr"]
+    if metodo_pago not in valid_methods:
+        raise GraphQLError("El método de pago no es válido")
+
+def validate_lateralidad(lateralidad):
+    valid_lateralidades = ["D", "I", "A"]
+    if lateralidad not in valid_lateralidades:
+        raise GraphQLError("La lateralidad no es válida")
 
 class StudentType(DjangoObjectType):
     class Meta: 
@@ -90,17 +146,37 @@ class CreateAlumno(graphene.Mutation):
     grado_grupo_asignado = graphene.String()
 
     class Arguments:
-        nombre = graphene.String()
-        apellido_paterno = graphene.String()
-        apellido_materno = graphene.String()
-        correo_institucional = graphene.String()
-        curp = graphene.String()
-        sexo = graphene.String()
-        escuela_procedencia = graphene.String()
-        grado_grupo_asignado = graphene.String()
+        nombre = graphene.String(required=True)
+        apellido_paterno = graphene.String(required=True)
+        apellido_materno = graphene.String(required=True)
+        correo_institucional = graphene.String(required=True)
+        curp = graphene.String(required=True)
+        sexo = graphene.String(required=True)
+        escuela_procedencia = graphene.String(required=True)
+        grado_grupo_asignado = graphene.String(required=True)
 
     def mutate(self, info, nombre, apellido_paterno, apellido_materno, correo_institucional, curp, sexo, escuela_procedencia, grado_grupo_asignado):
-        student = Alumno(nombre=nombre, apellidoPaterno=apellido_paterno, apellidoMaterno=apellido_materno, correoInstitucional=correo_institucional, curp=curp, sexo=sexo, escuelaProcedencia=escuela_procedencia, gradoGrupoAsignado=grado_grupo_asignado)
+        if len(nombre) > 100:
+            raise GraphQLError("El nombre es demasiado largo")
+        if len(apellido_paterno) > 100:
+            raise GraphQLError("El apellido paterno es demasiado largo")
+        if len(apellido_materno) > 100:
+            raise GraphQLError("El apellido materno es demasiado largo")
+        validate_email(correo_institucional)
+        validate_curp(curp)
+        if sexo not in ["M", "F"]:
+            raise GraphQLError("El valor de sexo no es válido")
+
+        student = Alumno(
+            nombre=nombre,
+            apellidoPaterno=apellido_paterno,
+            apellidoMaterno=apellido_materno,
+            correoInstitucional=correo_institucional,
+            curp=curp,
+            sexo=sexo,
+            escuelaProcedencia=escuela_procedencia,
+            gradoGrupoAsignado=grado_grupo_asignado
+        )
         student.save()
 
         return CreateAlumno(
@@ -112,7 +188,7 @@ class CreateAlumno(graphene.Mutation):
             curp=student.curp,
             sexo=student.sexo,
             escuela_procedencia=student.escuelaProcedencia,
-            grado_grupo_asignado=student.gradoGrupoAsignado,
+            grado_grupo_asignado=student.gradoGrupoAsignado
         )
     
 class ModifyAlumno(graphene.Mutation):
@@ -141,19 +217,29 @@ class ModifyAlumno(graphene.Mutation):
         try:
             student = Alumno.objects.get(pk=id)
         except Alumno.DoesNotExist:
-            raise Exception("Alumno not found")
+            raise GraphQLError("Alumno no encontrado")
 
         if nombre:
+            if len(nombre) > 100:
+                raise GraphQLError("El nombre es demasiado largo")
             student.nombre = nombre
         if apellido_paterno:
+            if len(apellido_paterno) > 100:
+                raise GraphQLError("El apellido paterno es demasiado largo")
             student.apellidoPaterno = apellido_paterno
         if apellido_materno:
+            if len(apellido_materno) > 100:
+                raise GraphQLError("El apellido materno es demasiado largo")
             student.apellidoMaterno = apellido_materno
         if correo_institucional:
+            validate_email(correo_institucional)
             student.correoInstitucional = correo_institucional
         if curp:
+            validate_curp(curp)
             student.curp = curp
         if sexo:
+            if sexo not in ["M", "F"]:
+                raise GraphQLError("El valor de sexo no es válido")
             student.sexo = sexo
         if escuela_procedencia:
             student.escuelaProcedencia = escuela_procedencia
@@ -161,7 +247,7 @@ class ModifyAlumno(graphene.Mutation):
             student.gradoGrupoAsignado = grado_grupo_asignado
 
         student.save()
-        
+
         return ModifyAlumno(
             id=student.id,
             nombre=student.nombre,
@@ -171,7 +257,7 @@ class ModifyAlumno(graphene.Mutation):
             curp=student.curp,
             sexo=student.sexo,
             escuela_procedencia=student.escuelaProcedencia,
-            grado_grupo_asignado=student.gradoGrupoAsignado,
+            grado_grupo_asignado=student.gradoGrupoAsignado
         )
     
 class DeleteAlumno(graphene.Mutation):
@@ -200,14 +286,20 @@ class CreatePago(graphene.Mutation):
     metodo_pago = graphene.String()
 
     class Arguments:
-        recibo = graphene.String()
-        descuento = graphene.Int()
-        id_recibo = graphene.Int()
-        monto = graphene.Float()
-        fecha_pago = graphene.Date()
-        metodo_pago = graphene.String()
+        recibo = graphene.String(required=True)
+        descuento = graphene.Int(required=False, default_value=0)
+        id_recibo = graphene.Int(required=True)
+        monto = graphene.Float(required=True)
+        fecha_pago = graphene.Date(required=True)
+        metodo_pago = graphene.String(required=True)
 
     def mutate(self, info, recibo, descuento, id_recibo, monto, fecha_pago, metodo_pago):
+        validate_url(recibo)
+        validate_descuento(descuento)
+        validate_monto(monto)
+        validate_fecha_pago(fecha_pago)
+        validate_metodo_pago(metodo_pago)
+
         payment = Pago(recibo=recibo, descuento=descuento, idRecibo=id_recibo, monto=monto, fechaPago=fecha_pago, metodoPago=metodo_pago)
         payment.save()
 
@@ -246,16 +338,21 @@ class ModifyPago(graphene.Mutation):
             raise Exception("Payment not found")
 
         if recibo:
+            validate_url(recibo)
             payment.recibo = recibo
         if descuento:
+            validate_descuento(descuento)
             payment.descuento = descuento
         if id_recibo:
             payment.idRecibo = id_recibo
         if monto:
+            validate_monto(monto)
             payment.monto = monto
         if fecha_pago:
+            validate_fecha_pago(fecha_pago)
             payment.fechaPago = fecha_pago
         if metodo_pago:
+            validate_metodo_pago(metodo_pago)
             payment.metodoPago = metodo_pago
 
         payment.save()
@@ -297,17 +394,38 @@ class CreatePadresTutores(graphene.Mutation):
     alumno = graphene.Field(StudentType)
 
     class Arguments:
-        nombre_padre_tutor = graphene.String()
-        curp_tutor = graphene.String()
-        scan_ine = graphene.String()
-        telefono = graphene.String()
-        scan_comprobante_domicilio = graphene.String()
-        email_padre_tutor = graphene.String()
-        alumno_id = graphene.Int()
+        nombre_padre_tutor = graphene.String(required=True)
+        curp_tutor = graphene.String(required=True)
+        scan_ine = graphene.String(required=True)
+        telefono = graphene.String(required=True)
+        scan_comprobante_domicilio = graphene.String(required=True)
+        email_padre_tutor = graphene.String(required=True)
+        alumno_id = graphene.Int(required=True)
 
     def mutate(self, info, nombre_padre_tutor, curp_tutor, scan_ine, telefono, scan_comprobante_domicilio, email_padre_tutor, alumno_id):
-        student = Alumno.objects.get(pk=alumno_id)
-        tutor = PadresTutores(nombrePadreTutor=nombre_padre_tutor, curpTutor=curp_tutor, scanIne=scan_ine, telefono=telefono, scanComprobanteDomicilio=scan_comprobante_domicilio, emailPadreTutor=email_padre_tutor, alumno=student)
+        if len(nombre_padre_tutor) > 100:
+            raise GraphQLError("El nombre del padre/tutor es demasiado largo")
+        
+        validate_curp(curp_tutor)
+        validate_url(scan_ine)
+        validate_telefono(telefono)
+        validate_url(scan_comprobante_domicilio)
+        validate_email(email_padre_tutor)
+
+        try:
+            student = Alumno.objects.get(pk=alumno_id)
+        except Alumno.DoesNotExist:
+            raise GraphQLError("Alumno no encontrado")
+
+        tutor = PadresTutores(
+            nombrePadreTutor=nombre_padre_tutor,
+            curpTutor=curp_tutor,
+            scanIne=scan_ine,
+            telefono=telefono,
+            scanComprobanteDomicilio=scan_comprobante_domicilio,
+            emailPadreTutor=email_padre_tutor,
+            alumno=student
+        )
         tutor.save()
 
         return CreatePadresTutores(
@@ -348,19 +466,35 @@ class ModifyPadresTutores(graphene.Mutation):
             raise Exception("Tutor not found")
 
         if nombre_padre_tutor:
+            if len(nombre_padre_tutor) > 100:
+                raise GraphQLError("El nombre del padre/tutor es demasiado largo")
             tutor.nombrePadreTutor = nombre_padre_tutor
+        
         if curp_tutor:
+            validate_curp(curp_tutor)
             tutor.curpTutor = curp_tutor
-        if scan_ine:
-            tutor.scanIne = scan_ine
+        
         if telefono:
+            validate_telefono(telefono)
             tutor.telefono = telefono
-        if scan_comprobante_domicilio:
-            tutor.scanComprobanteDomicilio = scan_comprobante_domicilio
+        
         if email_padre_tutor:
+            validate_email(email_padre_tutor)
             tutor.emailPadreTutor = email_padre_tutor
+        
+        if scan_ine:
+            validate_url(scan_ine)
+            tutor.scanIne = scan_ine
+        
+        if scan_comprobante_domicilio:
+            validate_url(scan_comprobante_domicilio)
+            tutor.scanComprobanteDomicilio = scan_comprobante_domicilio
+        
         if alumno_id:
-            student = Alumno.objects.get(pk=alumno_id)
+            try:
+                student = Alumno.objects.get(pk=alumno_id)
+            except Alumno.DoesNotExist:
+                raise GraphQLError("Alumno no encontrado")
             tutor.alumno = student
 
         tutor.save()
@@ -403,16 +537,27 @@ class CreateInscripcion(graphene.Mutation):
 
     class Arguments:
         factura = graphene.Boolean()
-        tipo_inscripcion = graphene.String()
-        modalidad_pago = graphene.String()
-        id_alumno = graphene.Int()
-        id_pago = graphene.Int()
-        id_usuario = graphene.Int()
+        tipo_inscripcion = graphene.String(required=True)
+        modalidad_pago = graphene.String(required=True)
+        id_alumno = graphene.Int(required=True)
+        id_pago = graphene.Int(required=True)
+        id_usuario = graphene.Int(required=True)
 
     def mutate(self, info, factura, tipo_inscripcion, modalidad_pago, id_alumno, id_pago, id_usuario):
-        student = Alumno.objects.get(pk=id_alumno)
-        payment = Pago.objects.get(pk=id_pago)
-        user = get_user_model().objects.get(pk=id_usuario)
+        validate_modalidad_pago(modalidad_pago)
+        validate_tipo_inscripcion(tipo_inscripcion)
+
+        try:
+            student = Alumno.objects.get(pk=id_alumno)
+            payment = Pago.objects.get(pk=id_pago)
+            user = get_user_model().objects.get(pk=id_usuario)
+        except Alumno.DoesNotExist:
+            raise GraphQLError("Alumno no encontrado")
+        except Pago.DoesNotExist:
+            raise GraphQLError("Pago no encontrado")
+        except get_user_model().DoesNotExist:
+            raise GraphQLError("Usuario no encontrado")
+
         enrollment = Inscripcion(
             factura=factura,
             tipoInscripcion=tipo_inscripcion,
@@ -457,21 +602,32 @@ class ModifyInscripcion(graphene.Mutation):
         except Inscripcion.DoesNotExist:
             raise Exception("Enrollment not found")
 
-        if factura:
+        if factura is not None:
             enrollment.factura = factura
         if tipo_inscripcion:
+            validate_tipo_inscripcion(tipo_inscripcion)
             enrollment.tipoInscripcion = tipo_inscripcion
         if modalidad_pago:
+            validate_modalidad_pago(modalidad_pago)
             enrollment.modalidadPago = modalidad_pago
         if id_alumno:
-            student = Alumno.objects.get(pk=id_alumno)
-            enrollment.idAlumno = student
+            try:
+                student = Alumno.objects.get(pk=id_alumno)
+                enrollment.idAlumno = student
+            except Alumno.DoesNotExist:
+                raise GraphQLError("Alumno no encontrado")
         if id_pago:
-            payment = Pago.objects.get(pk=id_pago)
-            enrollment.idPago = payment
+            try:
+                payment = Pago.objects.get(pk=id_pago)
+                enrollment.idPago = payment
+            except Pago.DoesNotExist:
+                raise GraphQLError("Pago no encontrado")
         if id_usuario:
-            user = get_user_model().objects.get(pk=id_usuario)
-            enrollment.idUsuario = user
+            try:
+                user = get_user_model().objects.get(pk=id_usuario)
+                enrollment.idUsuario = user
+            except get_user_model().DoesNotExist:
+                raise GraphQLError("Usuario no encontrado")
 
         enrollment.save()
         
@@ -532,10 +688,17 @@ class createAnexoAlumnos(graphene.Mutation):
         uso_aparato_auditivo = graphene.Boolean()
         uso_de_lentes = graphene.Boolean()
         lateralidad = graphene.String()
-        id_alumno = graphene.Int()
+        id_alumno = graphene.Int(required=True)
 
     def mutate(self, info, carta_buena_conducta, certificado_primaria, curp_alumno, acta_nacimiento, observaciones, cda, autorizacion_irse_solo, autorizacion_publicitaria, atencion_psicologica, padecimiento, uso_aparato_auditivo, uso_de_lentes, lateralidad, id_alumno):
-        student = Alumno.objects.get(pk=id_alumno)
+        try:
+            student = Alumno.objects.get(pk=id_alumno)
+        except Alumno.DoesNotExist:
+            raise GraphQLError("Alumno no encontrado")
+        
+        validate_url(cda)
+        validate_lateralidad(lateralidad)
+
         annex = AnexoAlumnos(
             cartaBuenaConducta=carta_buena_conducta,
             certificadoPrimaria=certificado_primaria,
@@ -623,6 +786,7 @@ class ModifyAnexoAlumnos(graphene.Mutation):
         if observaciones:
             annex.observaciones = observaciones
         if cda:
+            validate_url(cda)
             annex.cda = cda
         if autorizacion_irse_solo:
             annex.autorizacionIrseSolo = autorizacion_irse_solo
@@ -637,6 +801,7 @@ class ModifyAnexoAlumnos(graphene.Mutation):
         if uso_de_lentes:
             annex.usoDeLentes = uso_de_lentes
         if lateralidad:
+            validate_lateralidad(lateralidad)
             annex.lateralidad = lateralidad
         if id_alumno:
             student = Alumno.objects.get(pk=id_alumno)
