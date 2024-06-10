@@ -30,7 +30,7 @@ def validate_modalidad_pago(modalidad_pago):
         raise GraphQLError("Modalidad de pago no válida. Debe ser '12' o '10' meses")
 
 def validate_tipo_inscripcion(tipo_inscripcion):
-    if tipo_inscripcion not in ["inscripcion", "reinscripcion"]:
+    if tipo_inscripcion not in ["I", "R"]:
         raise GraphQLError("Tipo de inscripción no válido. Debe ser 'Inscripcion' o 'Reinscripcion'")
 
 def validate_descuento(descuento):
@@ -696,8 +696,6 @@ class createAnexoAlumnos(graphene.Mutation):
         except Alumno.DoesNotExist:
             raise GraphQLError("Alumno no encontrado")
         
-        validate_url(cda)
-        validate_lateralidad(lateralidad)
 
         annex = AnexoAlumnos(
             cartaBuenaConducta=carta_buena_conducta,
@@ -786,7 +784,6 @@ class ModifyAnexoAlumnos(graphene.Mutation):
         if observaciones:
             annex.observaciones = observaciones
         if cda:
-            validate_url(cda)
             annex.cda = cda
         if autorizacion_irse_solo:
             annex.autorizacionIrseSolo = autorizacion_irse_solo
@@ -801,7 +798,6 @@ class ModifyAnexoAlumnos(graphene.Mutation):
         if uso_de_lentes:
             annex.usoDeLentes = uso_de_lentes
         if lateralidad:
-            validate_lateralidad(lateralidad)
             annex.lateralidad = lateralidad
         if id_alumno:
             student = Alumno.objects.get(pk=id_alumno)
